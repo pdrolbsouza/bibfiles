@@ -8,65 +8,84 @@ jobs:
   dusk:
     runs-on: ubuntu-latest
 
-    senhaunica-faker:
-      image: uspdev/senhaunica-faker
-      env:
-        APP_URL: http://127.0.0.1:3141
-      ports:
-        - 3141:3141
-
-    env:
-      SERVICE_NAME: bibfiles
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_DATABASE: db
+          MARIADB_ROOT_PASSWORD: admin
+          MARIADB_USER: admin
+          MARIADB_PASSWORD: admin
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: yes
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+      senhaunica-faker:
+        image: uspdev/senhaunica-faker
+        env:
+          APP_URL: http://127.0.0.1:3141
+        ports:
+          - 3141:3141
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Create .env
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.4
+          extensions: mbstring, dom, pdo, mysql
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --no-progress --prefer-dist --optimize-autoloader
+
+      - name: Copy env from example
         run: cp .env.example .env
 
-      - name: Add auth.local to hosts to senhaunica-faker works properly
+      - name: Remove Dusk visual variables
         run: |
-          echo "127.0.0.1 auth.local" | sudo tee -a /etc/hosts
+          sed -i '/DUSK_START_MAXIMIZED/d' .env || true
+          sed -i '/DUSK_HEADLESS_DISABLED/d' .env || true
 
-      - name: Set UID/GID
+      - name: Configure .env file for testing
         run: |
-          echo "UID=$(id -u)" >> $GITHUB_ENV
-          echo "GID=$(id -g)" >> $GITHUB_ENV
+          echo "APP_URL=http://127.0.0.1:47800" >> .env
+          echo "DUSK_DRIVER_URL=http://localhost:9515" >> .env
+          echo "DB_CONNECTION=mysql" >> .env
+          echo "DB_HOST=127.0.0.1" >> .env
+          echo "DB_PORT=3306" >> .env
+          echo "DB_DATABASE=db" >> .env
+          echo "DB_USERNAME=admin" >> .env
+          echo "DB_PASSWORD=admin" >> .env
+          echo "SENHAUNICA_DEV=http://127.0.0.1:3141/wsusuario/oauth" >> .env
 
-      - name: Build and start containers
-        run: docker compose up -d --build
+      - name: Generate APP_KEY
+        run: php artisan key:generate
 
       - name: Wait for MariaDB
         run: |
-          for i in {1..40}; do
-            if docker compose exec -T mariadb mariadb -u${{ env.SERVICE_NAME }} -p${{ env.SERVICE_NAME }} -e "SELECT 1;" &> /dev/null; then
-              echo "MariaDB is ready"
-              exit 0
-            fi
-            echo "Waiting for MariaDB..."
+          for i in {1..30}; do
+            mysqladmin ping -h127.0.0.1 -P3306 --silent && break
             sleep 2
           done
 
-      - name: Install Composer dependencies
-        run: docker compose exec -T ${{ env.SERVICE_NAME }} composer install --no-interaction --prefer-dist
-
-      - name: Generate APP_KEY
-        run: docker compose exec -T ${{ env.SERVICE_NAME }} php artisan key:generate
-
       - name: Run migrations
-        run: docker compose exec -T ${{ env.SERVICE_NAME }} php artisan migrate --force
+        run: php artisan migrate --force
+
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@v1
 
       - name: Install ChromeDriver
-        run: docker compose exec -T ${{ env.SERVICE_NAME }} php artisan dusk:chrome-driver --detect
+        run: php artisan dusk:chrome-driver --detect
+
+      - name: Start Laravel server
+        run: php artisan serve --port=47800 &
 
       - name: Run Dusk
-        run: docker compose exec -T ${{ env.SERVICE_NAME }} php artisan dusk --without-tty
-
-      - name: Show logs on failure
-        if: failure()
-        run: docker compose logs
-
-      - name: Stop containers
-        if: always()
-        run: docker compose down -v
+        run: php artisan dusk --without-tty
