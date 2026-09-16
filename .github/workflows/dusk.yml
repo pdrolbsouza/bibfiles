@@ -85,13 +85,26 @@ jobs:
       - name: Install ChromeDriver
         run: php artisan dusk:chrome-driver --detect
 
-      - name: Start Laravel server
+      - name: Start Laravel server and run Dusk
         run: |
           php artisan serve --host=127.0.0.1 --port=47800 > /tmp/laravel.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+
           for i in {1..30}; do
-            curl --fail --silent http://127.0.0.1:47800/ > /dev/null && break
+            if curl --fail --silent http://127.0.0.1:47800/ > /dev/null; then
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat /tmp/laravel.log
+              exit 1
+            fi
             sleep 1
           done
 
-      - name: Run Dusk
-        run: php artisan dusk --without-tty
+          if ! curl --fail --silent http://127.0.0.1:47800/ > /dev/null; then
+            cat /tmp/laravel.log
+            exit 1
+          fi
+
+          php artisan dusk --without-tty
