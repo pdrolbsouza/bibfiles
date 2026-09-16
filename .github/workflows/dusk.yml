@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      SERVICE_NAME: copaco
+      SERVICE_NAME: bibfiles
 
     steps:
       - name: Checkout
