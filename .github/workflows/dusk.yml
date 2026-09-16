@@ -8,6 +8,13 @@ jobs:
   dusk:
     runs-on: ubuntu-latest
 
+    senhaunica-faker:
+      image: uspdev/senhaunica-faker
+      env:
+        APP_URL: http://127.0.0.1:3141
+      ports:
+        - 3141:3141
+
     env:
       SERVICE_NAME: bibfiles
 
