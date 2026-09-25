@@ -10,7 +10,8 @@ class EnviarArquivoTest extends DuskTestCase
 {
     public function test_EnviarArquivo(): void
     {
-        $file = UploadedFile::fake()->create('dusk-sample.pdf', 10, 'application/pdf');
+        $file = UploadedFile::fake()->createWithContent('dusk-sample.pdf', "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF"
+        );
 
         $this->browse(function (Browser $browser) use ($file) {
             $browser->visit('/')
@@ -18,9 +19,11 @@ class EnviarArquivoTest extends DuskTestCase
                 ->waitFor('#loginUsuario')
                 ->typeSlowly('#loginUsuario', '1111')
                 ->press('Login')
+                ->waitForLocation('/')
                 ->visit('/files/create')
-                ->attach('file', $file->getPathname())
-                ->type('name', 'Arquivo de teste Dusk')
+                ->waitFor('input[name="file"]')
+                ->attach('input[name="file"]', $file->getPathname())
+                ->type('input[name="name"]', 'Arquivo de teste Dusk')
                 ->press('Enviar')
                 ->assertPathIs('/files')
                 ->assertSee('Arquivo de teste Dusk');
