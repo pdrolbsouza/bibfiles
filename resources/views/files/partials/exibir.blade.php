@@ -19,7 +19,7 @@
 
 <tbody>
         @foreach($files as $arquivo)
-            <tr>
+            <tr data-file-name="{{ $arquivo->name }}">
                 <td>{{$arquivo->name}}</td>
                 <td>            
                 <a href="/{{$arquivo->original_name}}" type="application/pdf" target="pdf-frame"><i class="fas fa-file-pdf"></i> {{$arquivo->original_name}} </a>

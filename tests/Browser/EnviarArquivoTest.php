@@ -19,14 +19,23 @@ class EnviarArquivoTest extends DuskTestCase
                 ->waitFor('#loginUsuario')
                 ->typeSlowly('#loginUsuario', '1111')
                 ->press('Login')
+                ->pause(1000)
                 ->waitForLocation('/')
                 ->visit('/files/create')
                 ->waitFor('input[name="file"]')
                 ->attach('input[name="file"]', $file->getPathname())
                 ->type('input[name="name"]', 'Arquivo de teste Dusk')
                 ->press('Enviar')
+                ->pause(1000)
                 ->assertPathIs('/files')
-                ->assertSee('Arquivo de teste Dusk');
+                ->assertSee('Arquivo de teste Dusk')
+                ->waitFor('tr[data-file-name="Arquivo de teste Dusk"] button.botao')
+                ->click('tr[data-file-name="Arquivo de teste Dusk"] button.botao')
+                ->acceptDialog()
+                ->pause(1000)
+                ->waitForLocation('/files')
+                ->assertDontSee('Arquivo de teste Dusk')
+                ;
         });
     }
 }
